@@ -1,0 +1,17 @@
+# Passwords, tokens, credentials and private keys must stay local.
+.env
+.env.*
+*.env
+secrets.json
+secrets.*
+*secret*
+*credential*
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa*
+id_ed25519*
+.ssh/
+.aws/

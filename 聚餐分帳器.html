@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<title>聚餐分帳器</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;color:#183e37;background:#f3f4ed;font-synthesis:none}*{box-sizing:border-box}body{margin:0;padding:48px 20px}main{max-width:560px;margin:auto}.eyebrow{font-size:13px;letter-spacing:.14em;color:#647a69;font-weight:700}h1{font-size:36px;letter-spacing:-.04em;margin:12px 0}header p{color:#69766f;line-height:1.7;margin-bottom:28px}.card{background:#fff;border:1px solid #dfe5da;border-radius:24px;padding:28px;box-shadow:0 12px 40px #193d3410}label.field{display:block;font-weight:650;margin-bottom:22px}.input-wrap{display:flex;align-items:center;border:1px solid #b9c8bf;border-radius:12px;margin-top:9px;padding-right:16px;color:#718176}input[type=text],input[type=number]{min-width:0;width:100%;border:0;background:transparent;font:inherit;font-size:22px;color:#183e37;padding:14px;outline:none}.input-wrap:focus-within{outline:3px solid #c7e6d6;border-color:#287759}.check{display:flex;gap:12px;align-items:center;cursor:pointer}input[type=checkbox]{accent-color:#26765a;width:21px;height:21px}.hint{font-size:13px;color:#758078;line-height:1.6;margin:10px 0 22px}button{width:100%;border:0;border-radius:12px;background:#235e49;color:white;padding:16px;font:inherit;font-weight:700;cursor:pointer}button:hover{background:#194b39}button:focus-visible{outline:3px solid #91ba9c;outline-offset:3px}.result{margin-top:24px;border-top:1px dashed #cbd6cc;padding-top:24px}.result h2{font-size:14px;color:#64776a;margin:0 0 16px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0}.payer{background:#edf4e9;border-radius:14px;padding:18px}.amount{font-size:27px;font-weight:750;white-space:nowrap}.amount small{font-size:14px;font-weight:500}.tag{display:block;font-size:12px;color:#4f7651;margin-top:6px}.summary{font-size:14px;line-height:1.9;background:#f7f8f4;border-radius:12px;padding:16px;margin-top:14px}.summary div{display:flex;justify-content:space-between;gap:14px}.total{border-top:1px solid #dee5d9;margin-top:8px;padding-top:8px;font-weight:700}.error{color:#aa332a;line-height:1.6;margin:14px 0 0}footer{text-align:center;font-size:12px;line-height:1.8;color:#7a847c;margin-top:24px}[hidden]{display:none!important}@media(max-width:420px){body{padding:28px 16px}.card{padding:20px}h1{font-size:31px}.amount{font-size:24px}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="eyebrow">一起吃飯，輕鬆分帳</div><h1>聚餐分帳器</h1><p>輸入帳單金額，算好每個人的份額。<br>除不盡的零頭，由付錢的人負擔。</p></header>
+<section class="card">
+<form id="form" novalidate autocomplete="off">
+<label class="field" for="bill">總金額<div class="input-wrap"><input id="bill" type="text" inputmode="numeric" value="1000" maxlength="15" aria-describedby="moneyHint"><span>元</span></div></label>
+<label class="field" for="people">人數（包含付錢的人）<div class="input-wrap"><input id="people" type="number" inputmode="numeric" min="1" max="1000000" step="1" value="3"><span>人</span></div></label>
+<label class="check"><input type="checkbox" id="service">加上 10% 服務費</label>
+<p class="hint" id="moneyHint">請輸入整數元。服務費以四捨五入取整數元計算；帳單已含服務費時，請勿勾選。</p>
+<button type="submit">計算分帳</button>
+<p class="error" id="error" role="alert" hidden></p>
+</form>
+<section class="result" id="result" aria-live="polite" aria-atomic="true" hidden>
+<h2>這次這樣分</h2>
+<div class="row payer"><div>付錢的人<span class="tag" id="remainder"></span></div><div class="amount"><span id="payer"></span> <small>元</small></div></div>
+<div class="row" id="otherRow"><div>其他人各<span class="tag" id="otherCount"></span></div><div class="amount"><span id="each"></span> <small>元</small></div></div>
+<div class="summary"><div><span>原始金額</span><span id="original"></span></div><div><span>服務費</span><span id="fee"></span></div><div class="total"><span>分帳合計 ＝ 應付總額</span><span id="total"></span></div></div>
+<p class="hint" id="check" style="margin-bottom:0"></p>
+</section>
+</section>
+<footer>離線就能使用 · 無須登入 · 不儲存輸入資料</footer>
+</main>
+<script>
+'use strict';
+function splitBill(amount, people, addService) {
+  const bill = BigInt(amount), count = BigInt(people);
+  const fee = addService ? (bill + 5n) / 10n : 0n;
+  const total = bill + fee;
+  const each = total / count, remainder = total % count;
+  return {bill, fee, total, each, remainder, payer: each + remainder, count};
+}
+const el = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('zh-TW');
+function calculate(event) {
+  if (event) event.preventDefault();
+  const amount = el('bill').value.trim(), people = el('people').value.trim();
+  el('error').hidden = true;
+  el('result').hidden = true;
+  let error = '';
+  if (!/^\d{1,15}$/.test(amount)) error = '總金額請輸入 0 或正整數，最多 15 位數。';
+  else if (!/^\d+$/.test(people) || BigInt(people) < 1n || BigInt(people) > 1000000n) error = '人數請輸入 1 到 1,000,000 之間的整數，包含付錢的人。';
+  if (error) { el('error').textContent = error; el('error').hidden = false; return; }
+  const r = splitBill(amount, people, el('service').checked);
+  el('payer').textContent = fmt(r.payer);
+  el('each').textContent = fmt(r.each);
+  el('remainder').textContent = r.remainder ? '含除不盡的零頭 ' + fmt(r.remainder) + ' 元' : '沒有零頭，平均分攤';
+  el('otherCount').textContent = '共 ' + fmt(r.count - 1n) + ' 人';
+  el('otherRow').hidden = r.count === 1n;
+  el('original').textContent = fmt(r.bill) + ' 元';
+  el('fee').textContent = fmt(r.fee) + ' 元' + (el('service').checked ? '（10%）' : '（未加收）');
+  el('total').textContent = fmt(r.total) + ' 元';
+  el('check').textContent = r.count === 1n ? '由付錢的人負擔全部金額。' : '核對：' + fmt(r.payer) + ' ＋ ' + fmt(r.each) + ' × ' + fmt(r.count - 1n) + ' ＝ ' + fmt(r.total) + ' 元';
+  el('result').hidden = false;
+}
+el('form').addEventListener('submit', calculate);
+['bill', 'people', 'service'].forEach(id => el(id).addEventListener('input', () => { el('result').hidden = true; el('error').hidden = true; }));
+calculate();
+</script>
+</body>
+</html>
